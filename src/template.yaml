@@ -1,0 +1,3 @@
+topology: '${topology_name}'
+organism:
+    strain: '${strain_name}'
