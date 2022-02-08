@@ -12,7 +12,7 @@ build:
 push:
 	docker image push $(REGISTRY):$(TAG)
 	docker image push $(REGISTRY):latest
-	echo "xianmeng/$(NAME):$(TAG)" > LATEST
+	echo "fischbachlab/$(NAME):$(TAG)" > LATEST
 
 run:
 	docker container run --rm $(NAME):latest

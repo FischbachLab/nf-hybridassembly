@@ -89,7 +89,7 @@ process hybridassembly {
 
     script:
     """
-    export coverge="${params.coverage}"
+    export coverage="${params.coverage}"
     export fastq1="${params.reads1}"
     export fastq2="${params.reads2}"
     export longreads="${params.long_reads}"
