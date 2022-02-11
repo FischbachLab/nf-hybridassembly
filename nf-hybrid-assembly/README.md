@@ -16,3 +16,15 @@ aws batch submit-job \
 "--coverage", "100", \
 "--output_path", "s3://genomics-workflow-core/Pipeline_Results/HybridAssembly/biohub" "
 ```
+
+# updated version with a seedfile as the input
+```{bash}
+aws batch submit-job \
+  --job-name nf-hybrid-assembly \
+  --job-queue priority-maf-pipelines \
+  --job-definition nextflow-production \
+  --container-overrides command="s3://nextflow-pipelines/nf-hybrid-assembly, \
+"--seedfile", "s3://genomics-workflow-core/Pipeline_Results/HybridAssembly/2assemblies.tsv", \
+"--coverage", "100", \
+"--output_path", "s3://genomics-workflow-core/Pipeline_Results/HybridAssembly/2tests" "
+```
