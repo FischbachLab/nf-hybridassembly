@@ -19,14 +19,14 @@ ShortTargetBase=$((genomeSize*coverage*1))
 LongTargetBase=$((genomeSize*coverage*1))
 
 # Make sure neither the short read set nor long read set exceeds the certain limit
-if [ $ShortTargetBase -gt 2990000000 ]
+if [ $ShortTargetBase -gt 3990000000 ]
 then
-   ShortTargetBase=2990000000
+   ShortTargetBase=3990000000
 fi
 
-if [ $LongTargetBase -gt 2990000000 ]
+if [ $LongTargetBase -gt 3990000000 ]
 then
-   LongTargetBase=2990000000
+   LongTargetBase=3990000000
 fi
 # s3 inputs from env variables
 #fastq1="${1}"
@@ -290,7 +290,6 @@ samtools flagstat "${BWT_OUTPUT}/contigs_aligned.sorted.bam" > "${LOG_DIR}/conti
 #bamqc
 qualimap bamqc --java-mem-size=16G -nt ${coreNum} -outdir "${BAMQC_OUTPUT}" -bam "${BWT_OUTPUT}/contigs_aligned.sorted.bam" -c
 
-
 # align long reads to contigs
 minimap2 -t ${coreNum} -a "${ASSEMBLY_OUTPUT}/assembly.fasta"  "${QC_FASTQ}/long_trimmed.fastq.gz" | samtools sort -@${coreNum} -o "${BAMQC_OUTPUT2}/longreads_vs_contigs.sorted.bam" -
 samtools index "${BAMQC_OUTPUT2}/longreads_vs_contigs.sorted.bam"
@@ -310,6 +309,10 @@ ${ASSEMBLY_OUTPUT}/assembly.fasta \
 #########################################################
 echo "Reads stats after assembly"
 #########################################################
+#get coverage cal_depth
+RunDate=`cat ${ASSEMBLY_OUTPUT}/unicycler.log | grep -P "^Starting Unicycler" | cut -d "(" -f2 | cut -d " " -f1`
+shortDepth=`cat ${BAMQC_OUTPUT}/genome_results.txt | grep -P "mean coverageData =" | cut -d= -f2 | cut -f1 -dX`
+longDepth=`cat ${BAMQC_OUTPUT2}/genome_results.txt | grep -P "mean coverageData =" | cut -d= -f2 | cut -f1 -dX`
 
 # Count input reads, PE reads count once
 totalShortReads=$(( $( zcat ${RAW_FASTQ}/read1.fastq.gz | wc -l ) / 4 ))
@@ -343,8 +346,8 @@ LongByShortCoverage=`cat ${LOG_DIR}/long_vs_short-stats.txt | grep -P "^Percent 
 rm -r "${BWT_OUTPUT}"
 
 
-echo 'Sample_Name,Total_LongReads,Total_ShortReads,Total_contigs,longAfterSampling,shortAfterSampling,long_mapping,short_mapping,AvgLongReadLength,LongByShortCoverage,Assembly_status' > ${LOG_DIR}/read_stats.csv
-echo ${SAMPLE_NAME}','${totalLongReads}','${totalShortReads}','${totalContigs}','${longAfterTrim}'('$longUsedRate'%),'${sampledReads}'('$shortUsedRate'%),'${long_mapping}','${short_mapping}','${AvgLongReadLength}','${LongByShortCoverage}'%,'${status} >> ${LOG_DIR}/read_stats.csv
+echo 'SampleName,Date,LongDepth,ShortDepth,TotalLongReads,TotalShortReads,TotalContigs,longAfterSamplingPct,shortAfterSamplingPct,longMappingPct,shortMappingPct,AvgLongReadLength,LongByShortCoverage,AssemblyStatus' > ${LOG_DIR}/read_stats.csv
+echo ${SAMPLE_NAME}','${RunDate}','${longDepth}','${shortDepth}','${totalLongReads}','${totalShortReads}','${totalContigs}','$longUsedRate','$shortUsedRate','${long_mapping}','${short_mapping}','${AvgLongReadLength}','${LongByShortCoverage}','${status} >> ${LOG_DIR}/read_stats.csv
 
 # Grep Assembly summary
 tail -n 1 ${LOG_DIR}/unicycler_assembly.log.txt > ${LOG_DIR}/unicycler_summary.txt

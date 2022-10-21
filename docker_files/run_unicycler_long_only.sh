@@ -9,7 +9,7 @@ export PATH="/opt/conda/bin:${PATH}"
 
 LOCAL=$(pwd)
 coreNum=${coreNum:-16};
-
+sampleRate=${sampleRate:-100}
 # s3 inputs from env variables
 #longreads="${1}" input long reads in fastq
 #S3OUTPUTPATH = "${2}"
@@ -40,6 +40,7 @@ aws s3 cp --quiet ${longreads} "${RAW_FASTQ}/long.fastq.gz"
 # filter long reads without reference --target_bases 500000000 \
 filtlong \
 --min_length 1000 \
+--keep_percent $sampleRate \
 "${RAW_FASTQ}/long.fastq.gz" | gzip > "${QC_FASTQ}/long_trimmed.fastq.gz"
 
 
