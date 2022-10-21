@@ -1,7 +1,7 @@
 Hello world script
 ====================
 
-A simple script showing the hybrid assembly example for the Nextflow framework.
+# A simple script showing the hybrid assembly example for the Nextflow framework.
 
 
 ```{bash}
@@ -17,7 +17,7 @@ aws batch submit-job \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/biohub" "
 ```
 
-# updated version with a seedfile as the input
+## The latest version with a seedfile as the input
 ```{bash}
 aws batch submit-job \
   --job-name nf-hybrid-assembly \
@@ -29,8 +29,8 @@ aws batch submit-job \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/BrianYu_20220311" "
 ```
 
-# long reads only assembly *** NOT WORKING using long.nf rather than default name main.nf ***
-# sampleRate must be greater than 0 and less than 100
+### long reads only assembly *** NOT WORKING using long.nf rather than default name main.nf ***
+#### sampleRate must be greater than 0 and less than 100
 ```{bash}
 aws batch submit-job \
   --job-name nf-hybrid-assembly \
@@ -42,8 +42,14 @@ aws batch submit-job \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/Nathan_20220301/tmp" "
 ```
 
+# Seedfile example
+## Note that the seedfile is a tab-separated values file without header
+## The format is sample_name, short_R1, short_R2 and long_reads
+
+```{bash}
+SH0001651-00109 s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R1.fastq.gz s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R2.fastq.gz s3://maf-sequencing/nanopore/MITI/Combined/SH0001651-00109.combined.fastq.gz
+```
 # MITI MCB Hybrid assembly example
-## Note that the seedfile has no header and the format is sample_name, short_R1, short_R2 and long_reads
 ```{bash}
 aws batch submit-job \
   --job-name nf-hybrid-assembly \
