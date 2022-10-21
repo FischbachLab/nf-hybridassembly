@@ -130,8 +130,8 @@ reformat.sh -Xmx16g -eoom \
 
 # Constant definitions for bbduk, increased the quailty
 adapterFile="adapters,phix"
-trimQuality=${trimQuality:-25} #old 25
-minLength=${minLength:-50}  #old 50
+trimQuality=${trimQuality:-25}
+minLength=${minLength:-50}
 kmer_value=${kmer_value:-23}
 min_kmer_value=${min_kmer_value:-11}
 
@@ -165,7 +165,7 @@ reformat.sh -Xmx16g -eoom \
 echo "**************************" >> ${LOG_DIR}/bbtools.log.txt
 echo "Dereplication" >> ${LOG_DIR}/bbtools.log.txt
 echo "**************************" >> ${LOG_DIR}/bbtools.log.txt
-timem dedupe.sh -Xmx60g \
+timem dedupe.sh -Xmx100g \
         in="${QC_FASTQ}/trimmed-interleaved.fastq.gz" \
         out="${QC_FASTQ}/deduped-interleaved.fastq.gz" \
         >> ${LOG_DIR}/bbtools.log.txt 2>&1
@@ -179,7 +179,7 @@ timem dedupe.sh -Xmx60g \
 echo "**************************" >> ${LOG_DIR}/bbtools.log.txt
 echo "Coverage Normalization" >> ${LOG_DIR}/bbtools.log.txt
 echo "**************************" >> ${LOG_DIR}/bbtools.log.txt
-timem bbnorm.sh -Xmx60g \
+timem bbnorm.sh -Xmx100g \
 target=${coverage} min=3 \
 in="${QC_FASTQ}/deduped-interleaved.fastq.gz" \
 out="${QC_FASTQ}/normalized-interleaved.fastq.gz" \
@@ -221,8 +221,6 @@ echo "**************************"
 echo "Pre-Processing Long reads"
 echo "**************************"
 
-# get long read length Histogram
-readlength.sh in="${RAW_FASTQ}/long.fastq.gz" bin=1000 max=10000 ignorebadquality > ${LOG_DIR}/longreads.LengthHistogram.txt
 
 # convert bam to fastq for long reads
 #samtools bam2fq  "${RAW_FASTQ}/long.bam" >  "${RAW_FASTQ}/long.fastq"
@@ -244,17 +242,13 @@ fastqc \
 -o ${FASTQC_OUTPUT2} \
 "${QC_FASTQ}/long_trimmed.fastq.gz"
 
-# get filtered long read length Histogram
-readlength.sh in="${QC_FASTQ}/long_trimmed.fastq.gz" bin=1000 max=20000 ignorebadquality > ${LOG_DIR}/Filtered_longreads.LengthHistogram.txt
-
-
 
 
 ######################### HOUSEKEEPING #############################
-DURATION=$((SECONDS - START_TIME))
-hrs=$(( DURATION/3600 )); mins=$(( (DURATION-hrs*3600)/60)); secs=$(( DURATION-hrs*3600-mins*60 ))
-printf 'This AWSome pipeline took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
-echo "Live long and prosper" >> ${LOCAL_OUTPUT}/job.complete
+#DURATION=$((SECONDS - START_TIME))
+#hrs=$(( DURATION/3600 )); mins=$(( (DURATION-hrs*3600)/60)); secs=$(( DURATION-hrs*3600-mins*60 ))
+#printf 'This AWSome pipeline took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
+#echo "Live long and prosper" >> ${LOCAL_OUTPUT}/job.complete
 ############################ PEACE! ################################
 ## Sync output
 aws s3 sync "${LOCAL_OUTPUT}" "${S3OUTPUTPATH}"

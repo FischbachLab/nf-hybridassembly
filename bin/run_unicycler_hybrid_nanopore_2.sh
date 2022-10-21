@@ -9,31 +9,7 @@ export PATH="/opt/conda/bin:${PATH}"
 
 LOCAL=$(pwd)
 coreNum=${coreNum:-16}
-ShortTargetBase=${ShortTargetBase:-500000000}
-LongTargetBase=${LongTargetBase:-500000000}
-genomeSize=${genomeSize:-5000000}
-coverage=${coverage:-400}
 
-# if the genomeSize is give, then overwrite the TargetBase parameters
-ShortTargetBase=$((genomeSize*coverage*1))
-LongTargetBase=$((genomeSize*coverage*1))
-
-# Make sure neither the short read set nor long read set exceeds the certain limit
-if [ $ShortTargetBase -gt 3990000000 ]
-then
-   ShortTargetBase=3990000000
-fi
-
-if [ $LongTargetBase -gt 3990000000 ]
-then
-   LongTargetBase=3990000000
-fi
-# s3 inputs from env variables
-#fastq1="${1}"
-#fastq2="${2}"
-#longreads="${3}" input long reads in fastq format
-#S3OUTPUTPATH="${4}"
-#genomeSize="${5}" genome size in bp
 
 
 # Setup directory structure
@@ -83,17 +59,16 @@ unicycler \
 -1 "${QC_FASTQ}/read1_sampled.fastq.gz" \
 -2 "${QC_FASTQ}/read2_sampled.fastq.gz" \
 -l "${QC_FASTQ}/long_trimmed.fastq.gz" \
--o ${ASSEMBLY_OUTPUT} |\
-tee -a ${LOG_DIR}/unicycler_assembly.log.txt
-
+-o ${ASSEMBLY_OUTPUT} \
+&>> ${LOG_DIR}/unicycler_assembly.log.txt
 
 
 ######################### HOUSEKEEPING #############################
 DURATION=$((SECONDS - START_TIME))
 hrs=$(( DURATION/3600 )); mins=$(( (DURATION-hrs*3600)/60)); secs=$(( DURATION-hrs*3600-mins*60 ))
-printf 'This AWSome pipeline took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
+printf 'Unicycler took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
 echo "Live long and prosper" >> ${LOCAL_OUTPUT}/job.complete
 ############################ PEACE! ################################
 ## Sync output
-aws s3 sync "${LOCAL_OUTPUT}" "${S3OUTPUTPATH}"
+#aws s3 sync "${LOCAL_OUTPUT}" "${S3OUTPUTPATH}"
 # rm -rf "${OUTPUTDIR}"

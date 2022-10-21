@@ -8,33 +8,7 @@ START_TIME=$SECONDS
 export PATH="/opt/conda/bin:${PATH}"
 
 LOCAL=$(pwd)
-coreNum=${coreNum:-8}
-ShortTargetBase=${ShortTargetBase:-500000000}
-LongTargetBase=${LongTargetBase:-500000000}
-genomeSize=${genomeSize:-5000000}
-coverage=${coverage:-400}
-
-# if the genomeSize is give, then overwrite the TargetBase parameters
-ShortTargetBase=$((genomeSize*coverage*1))
-LongTargetBase=$((genomeSize*coverage*1))
-
-# Make sure neither the short read set nor long read set exceeds the certain limit
-if [ $ShortTargetBase -gt 3990000000 ]
-then
-   ShortTargetBase=3990000000
-fi
-
-if [ $LongTargetBase -gt 3990000000 ]
-then
-   LongTargetBase=3990000000
-fi
-# s3 inputs from env variables
-#fastq1="${1}"
-#fastq2="${2}"
-#longreads="${3}" input long reads in fastq format
-#S3OUTPUTPATH="${4}"
-#genomeSize="${5}" genome size in bp
-
+coreNum=${coreNum:-16}
 
 # Setup directory structure
 OUTPUTDIR=${LOCAL}/tmp_$( date +"%Y%m%d_%H%M%S" )
@@ -66,11 +40,20 @@ mkdir -p "${ASSEMBLY_OUTPUT}" "${QUAST_OUTPUT}" "${FASTQC_OUTPUT}" "${FASTQC_OUT
 mkdir -p "${LOCAL_DB_PATH}" "${BWT_OUTPUT}"  "${BAMQC_OUTPUT}" "${BAMQC_OUTPUT2}" "${RAW_NANOPORE}"
 trap '{ rm -rf ${OUTPUTDIR} ; exit 255; }' 1
 
-
 mv $fastq1 "${QC_FASTQ}/read1_sampled.fastq.gz"
 mv $fastq2 "${QC_FASTQ}/read2_sampled.fastq.gz"
 mv $longreads "${QC_FASTQ}/long_trimmed.fastq.gz"
 mv $assembly "${ASSEMBLY_OUTPUT}/assembly.fasta"
+mv $log "${ASSEMBLY_OUTPUT}/unicycler.log"
+
+
+# get long read length Histogram
+#readlength.sh in="${QC_FASTQ}/long_trimmed.fastq.gz" bin=1000 max=10000 ignorebadquality > ${LOG_DIR}/longreads.LengthHistogram.txt
+
+# get filtered long read length Histogram
+readlength.sh in="${QC_FASTQ}/long_trimmed.fastq.gz" bin=1000 max=20000 ignorebadquality > ${LOG_DIR}/Filtered_longreads.LengthHistogram.txt
+
+
 
 ## Build the database
 # --threads ${coreNum} \
@@ -125,17 +108,17 @@ shortDepth=`cat ${BAMQC_OUTPUT}/genome_results.txt | grep -P "mean coverageData 
 longDepth=`cat ${BAMQC_OUTPUT2}/genome_results.txt | grep -P "mean coverageData =" | cut -d= -f2 | cut -f1 -dX`
 
 # Count input reads, PE reads count once
-totalShortReads=$(( $( zcat ${RAW_FASTQ}/read1.fastq.gz | wc -l ) / 4 ))
-totalTrimmedReads=$(( $( zcat ${QC_FASTQ}/read1_trimmed.fastq.gz | wc -l ) / 4 ))
-totalLongReads=$(( $( zcat ${RAW_FASTQ}/long.fastq.gz | wc -l ) / 4 ))
-sampledReads=$(( $( zcat  ${QC_FASTQ}/read1_sampled.fastq.gz | wc -l ) / 4 ))
-longAfterTrim=$(( $( zcat ${QC_FASTQ}/long_trimmed.fastq.gz | wc -l ) / 4 ))
+totalShortReads=$(( $( zcat ${QC_FASTQ}/read1_sampled.fastq.gz | wc -l ) / 4 ))
+#totalTrimmedReads=$(( $( zcat ${QC_FASTQ}/read1_trimmed.fastq.gz | wc -l ) / 4 ))
+totalLongReads=$(( $( zcat ${QC_FASTQ}/long_trimmed.fastq.gz | wc -l ) / 4 ))
+#sampledReads=$(( $( zcat  ${QC_FASTQ}/read1_sampled.fastq.gz | wc -l ) / 4 ))
+#longAfterTrim=$(( $( zcat ${QC_FASTQ}/long_trimmed.fastq.gz | wc -l ) / 4 ))
 totalContigs=$(grep -c "^>" ${ASSEMBLY_OUTPUT}/assembly.fasta )
 
-shortUsedRate=`echo "scale=2; $sampledReads*100/$totalTrimmedReads" | bc -l`
-longUsedRate=`echo "scale=2; $longAfterTrim*100/$totalLongReads" | bc -l`
+#shortUsedRate=`echo "scale=2; $sampledReads*100/$totalTrimmedReads" | bc -l`
+#longUsedRate=`echo "scale=2; $longAfterTrim*100/$totalLongReads" | bc -l`
 
-AvgLongReadLength=`cat ${LOG_DIR}/longreads.LengthHistogram.txt | grep -P "^#Avg:" | cut -f 2-`
+AvgLongReadLength=`cat ${LOG_DIR}/Filtered_longreads.LengthHistogram.txt| grep -P "^#Avg:" | cut -f 2-`
 
 if grep -q "  incomplete" ${ASSEMBLY_OUTPUT}/unicycler.log; then
     status="Incomplete"
@@ -146,21 +129,21 @@ fi
 short_mapping=`grep "number of mapped reads" "${BAMQC_OUTPUT}/genome_results.txt" | awk -F '[()]' '{print $2}'`
 long_mapping=`grep "number of mapped reads" "${BAMQC_OUTPUT2}/genome_results.txt" | awk -F '[()]' '{print $2}'`
 
-echo "*********Get long reads coverage stats by short reads *****************"
-minimap2 -t ${coreNum} -ax sr "${QC_FASTQ}/long_trimmed.fastq.gz" "${QC_FASTQ}/read1_sampled.fastq.gz" "${QC_FASTQ}/read2_sampled.fastq.gz" > "${BWT_OUTPUT}/short_vs_long.sam"
-pileup.sh in="${BWT_OUTPUT}/short_vs_long.sam" out=${LOG_DIR}/long_vs_short-coverage.txt 2> ${LOG_DIR}/long_vs_short-stats.txt
+echo "*********Get assembly coverage stats by short reads *****************"
+minimap2 -t ${coreNum} -ax sr "${ASSEMBLY_OUTPUT}/assembly.fasta" "${QC_FASTQ}/read1_sampled.fastq.gz" "${QC_FASTQ}/read2_sampled.fastq.gz" > "${BWT_OUTPUT}/short_vs_assembly.sam"
+pileup.sh in="${BWT_OUTPUT}/short_vs_assembly.sam" out=${LOG_DIR}/assembly_vs_short-coverage.txt 2> ${LOG_DIR}/assembly_vs_short-stats.txt
 
-LongByShortCoverage=`cat ${LOG_DIR}/long_vs_short-stats.txt | grep -P "^Percent of reference bases covered:" | cut -f 2-`
+AssemblyByShortCover=`cat ${LOG_DIR}/assembly_vs_short-stats.txt | grep -P "^Percent of reference bases covered:" | cut -f 2-`
 
 # clean data
 rm -r "${BWT_OUTPUT}"
 
 
-echo 'SampleName,Date,LongDepth,ShortDepth,TotalLongReads,TotalShortReads,TotalContigs,longAfterSamplingPct,shortAfterSamplingPct,longMappingPct,shortMappingPct,AvgLongReadLength,LongByShortCoverage,AssemblyStatus' > ${LOG_DIR}/read_stats.csv
-echo ${SAMPLE_NAME}','${RunDate}','${longDepth}','${shortDepth}','${totalLongReads}','${totalShortReads}','${totalContigs}','$longUsedRate','$shortUsedRate','${long_mapping}','${short_mapping}','${AvgLongReadLength}','${LongByShortCoverage}','${status} >> ${LOG_DIR}/read_stats.csv
+echo 'SampleName,Date,LongDepth,ShortDepth,TotalSampledLongReads,TotalSampledShortReads,TotalContigs,longMappingPct,shortMappingPct,AvgLongReadLength,AssemblyByShortCover,AssemblyStatus' > ${LOG_DIR}/read_stats.csv
+echo ${SAMPLE_NAME}','${RunDate}','${longDepth}','${shortDepth}','${totalLongReads}','${totalShortReads}','${totalContigs}','${long_mapping}','${short_mapping}','${AvgLongReadLength}','${AssemblyByShortCover}','${status} >> ${LOG_DIR}/read_stats.csv
 
 # Grep Assembly summary
-tail -n 1 ${LOG_DIR}/unicycler_assembly.log.txt > ${LOG_DIR}/unicycler_summary.txt
+#tail -n 1 ${LOG_DIR}/unicycler_assembly.log.txt > ${LOG_DIR}/unicycler_summary.txt
 grep -A 15 "^Bridged assembly graph" ${ASSEMBLY_OUTPUT}/unicycler.log >> ${LOG_DIR}/unicycler_summary.txt
 
 
@@ -175,13 +158,12 @@ if grep -q "  incomplete" ${ASSEMBLY_OUTPUT}/unicycler.log; then
     echo "Assembly Post-Processing" >> ${LOG_DIR}/post-processing.log.txt
     echo "**************************" >> ${LOG_DIR}/post-processing.log.txt
 
-      Assembly=${ASSEMBLY_OUTPUT}/assembly.fasta  #"/data/BrianYu/nanopore_hybird/CloseGaps/Blautia-sp-KLE/Blautia-sp-KLE.assembly.fasta"
-      Nanopore_reads="${RAW_FASTQ}/long.fastq.gz" #"/data/BrianYu/nanopore_hybird/CloseGaps/Blautia-sp-KLE/Blautia-sp-KLE-1732-HM-1032__barcode15.fastq.gz"
+      Assembly=${ASSEMBLY_OUTPUT}/assembly.fasta
+      Nanopore_reads="${QC_FASTQ}/long_trimmed.fastq.gz"
 
-      genome=${SAMPLE_NAME} #"Blautia-sp-KLE"
+      genome=${SAMPLE_NAME}
 
       # Align Long reads to drraft assembly
-
       minimap2 -t 8 $Assembly $Nanopore_reads > ${RAW_FASTQ}/aln.mm
 
       # Form scaffolds
@@ -223,7 +205,7 @@ if grep -q "  incomplete" ${ASSEMBLY_OUTPUT}/unicycler.log; then
           cp ${POST_OUTPUT}/circular_output/circular.scaff_seqs ${POST_OUTPUT}/final_circular_scaffolds.fasta
 
           # Run Quast for comparison between assembled contigs and gap-closed contigs
-          quast.py -t 8 --glimmer --rna-finding --contig-thresholds 2500,5000,10000,50000,100000,500000,1000000 \
+          quast.py -t ${coreNum} --glimmer --rna-finding --contig-thresholds 2500,5000,10000,50000,100000,500000,1000000 \
           -l $genome,${genome}.GapsClosed  \
           -o post_quast $Assembly ${POST_OUTPUT}/tgsgapcloser_output/gaps.scaff_seqs
 
@@ -280,10 +262,10 @@ rm -f temp.yml
 
 
 ######################### HOUSEKEEPING #############################
-DURATION=$((SECONDS - START_TIME))
-hrs=$(( DURATION/3600 )); mins=$(( (DURATION-hrs*3600)/60)); secs=$(( DURATION-hrs*3600-mins*60 ))
-printf 'This AWSome pipeline took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
-echo "Live long and prosper" >> ${LOCAL_OUTPUT}/job.complete
+#DURATION=$((SECONDS - START_TIME))
+#hrs=$(( DURATION/3600 )); mins=$(( (DURATION-hrs*3600)/60)); secs=$(( DURATION-hrs*3600-mins*60 ))
+#printf 'This AWSome pipeline took: %02d:%02d:%02d\n' $hrs $mins $secs > ${LOCAL_OUTPUT}/job.complete
+#echo "Live long and prosper" >> ${LOCAL_OUTPUT}/job.complete
 ############################ PEACE! ################################
 ## Sync output
 aws s3 sync "${LOCAL_OUTPUT}" "${S3OUTPUTPATH}"

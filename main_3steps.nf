@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-//nextflow.enable.dsl=1
+nextflow.enable.dsl=1
 // If the user uses the --help flag, print the help text below
 params.help = false
 
@@ -57,15 +57,15 @@ Channel
   /*
    * Run Hybridassembly Pipeline
    */
-  process hybridassembly {
+  process hybridassembly_1 {
 
       tag "$sample"
       //container "xianmeng/nf-hybridassembly:latest"
       container params.container
-      cpus   16 // 32
-      memory 60 //128.GB
+      cpus   32
+      memory 128.GB
 
-      publishDir "${output_path}", mode:'copy'
+      //publishDir "${output_path}", mode:'copy'
 
       input:
     	tuple val(sample), val(reads1), val(reads2), val(long_reads) from seedfile_ch
@@ -95,29 +95,34 @@ Channel
 
 process hybridassembly_2 {
 
+    tag "${sample}"
     container "quay.io/biocontainers/unicycler:0.5.0--py39h2add14b_2"
     cpus 16
-    memory 32.GB
+    memory 64.GB
 
-    publishDir "${output_path}", mode:'copy'
+    publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "*.{log,gfa,fasta}"
+    publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "assembly.*"
+    //publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "*.{log,gfa}"
+    //publishDir "${output_path}/${sample}/Logs", mode:'copy', pattern: '*.txt'
 
     input:
-  	tuple val(sample), path(reads1), path(reads2), path(long_reads) from reads_ch
+  	tuple val(sample), path(read1), path(read2), path(long_read) from reads_ch
 
     output:
-    tuple val(sample), path(reads1), path(reads2), path(long_reads), path("tmp_*/Sync/UNICYCLER/assembly.fasta") into reads_ch2
-
+    file "tmp_*/Sync/UNICYCLER/*"
+    file "tmp_*/Sync/UNICYCLER/assembly.gfa"
+    //file "tmp_*/Sync/Logs/unicycler_assembly.log.txt"
+    tuple val(sample),  path("tmp_*/trimmed_fastq/read1_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/read2_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/long_trimmed.fastq.gz"), path("tmp_*/Sync/UNICYCLER/assembly.fasta"), path("tmp_*/Sync/UNICYCLER/unicycler.log") into reads_ch2
 
     script:
     """
-    export fastq1=${read1}
-    export fastq2=${read2}
-    export longreads=${long_read}
-    export S3OUTPUTPATH="${output_path}"
+    export fastq1="${read1}"
+    export fastq2="${read2}"
+    export longreads="${long_read}"
+    export S3OUTPUTPATH="${output_path}/${sample}"
     run_unicycler_hybrid_nanopore_2.sh
     """
 }
-
 
 /*
  * Run Hybridassembly Pipeline Step 3
@@ -125,15 +130,15 @@ process hybridassembly_2 {
 */
 
 process hybridassembly_3 {
-
+    tag "$sample"
     container "fischbachlab/nf-hybridassembly:latest"
-    cpus 8
-    memory 16.GB
+    cpus 16
+    memory 64.GB
 
-    publishDir "${output_path}", mode:'copy'
+    //publishDir "${output_path}", mode:'copy'
 
     input:
-    tuple val(sample), path(reads1), path(reads2), path(long_reads), path(assembled_reads) from reads_ch2
+    tuple val(sample), path(read_1), path(read_2), path(long_read), path(assembled_reads), path(assembly_log) from reads_ch2
 
 
     output:
@@ -141,11 +146,12 @@ process hybridassembly_3 {
 
     script:
     """
-    export fastq1=${read1}
-    export fastq2=${read2}
-    export longreads=${long_read}
-    export assembly=${assembled_reads}
-    export S3OUTPUTPATH="${output_path}"
+    export fastq1="${read_1}"
+    export fastq2="${read_2}"
+    export longreads="${long_read}"
+    export assembly="${assembled_reads}"
+    export log="${assembly_log}"
+    export S3OUTPUTPATH="${output_path}/${sample}"
     run_unicycler_hybrid_nanopore_3.sh
     """
 }
