@@ -1,4 +1,4 @@
-Hello world script
+Sample scripts
 ====================
 
 # A simple script showing the hybrid assembly example for the Nextflow framework.
@@ -44,18 +44,19 @@ aws batch submit-job \
 
 # Seedfile example
 ## Note that the seedfile is a tab-separated values file without header
-## The format is sample_name, short_R1, short_R2 and long_reads
+## The format is sample_name, prefix, short_R1, short_R2 and long_reads
 
 ```{bash}
-SH0001651-00109 s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R1.fastq.gz s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R2.fastq.gz s3://maf-sequencing/nanopore/MITI/Combined/SH0001651-00109.combined.fastq.gz
+SH0001651-00109 20221021 s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R1.fastq.gz s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH0001651_R2.fastq.gz s3://maf-sequencing/nanopore/MITI/Combined/SH0001651-00109.combined.fastq.gz
 ```
 # MITI MCB Hybrid assembly example
+### Final output path: s3://genomics-workflow-core/Results/HybridAssembly/MITI-MCB/sample_name/prefix/
 ```{bash}
 aws batch submit-job \
   --job-name nf-hybrid-assembly \
   --job-queue priority-maf-pipelines \
   --job-definition nextflow-production \
-  --container-overrides command="s3://nextflow-pipelines/nf-hybrid-assembly, \
+  --container-overrides command="FischbachLab/nf-hybridassembly, \
 "--seedfile", "s3://genomics-workflow-core/Results/HybridAssembly/20221018.11.seedfile.tsv", \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/MITI-MCB" "
 ```

@@ -26,20 +26,23 @@
  my $writer=new Bio::SeqIO(-format=>'fasta',-file=>">$outFile");
  while (my $rec=$rdr->next_seq)
  {
-   if ($rec->id=~/$regexp/ || (defined $targetId && $rec->id eq $targetId))
+   if ($rec->length > 600 )
    {
-     print $rec->id, "  ", $rec->length,  "\n";
-     my $headSeq=$rec->subseq(1,$splitPoint);
-     $maxPos=$rec->length; #unless (defined $maxPos);
-     #print $maxPos, "\n";
-     my $tailSeq=$rec->subseq($splitPoint+1,$maxPos);
-     my $revFlag=""; $revFlag=".rc" if ($reverse);
-     my $newSeq=new Bio::Seq(-id=>$prefix.$rec->id.".cp.$splitPoint$revFlag",-seq=>$tailSeq."N".$headSeq);
-     $newSeq=$newSeq->revcom if ($reverse);
-     $writer->write_seq($newSeq);
-   }
-   else
-   {
-     $writer->write_seq($rec);
+     if ($rec->id=~/$regexp/ || (defined $targetId && $rec->id eq $targetId))
+     {
+       print $rec->id, "  ", $rec->length,  "\n";
+       my $headSeq=$rec->subseq(1,$splitPoint);
+       $maxPos=$rec->length; #unless (defined $maxPos);
+       #print $maxPos, "\n";
+       my $tailSeq=$rec->subseq($splitPoint+1,$maxPos);
+       my $revFlag=""; $revFlag=".rc" if ($reverse);
+       my $newSeq=new Bio::Seq(-id=>$prefix.$rec->id.".cp.$splitPoint$revFlag",-seq=>$tailSeq."N".$headSeq);
+       $newSeq=$newSeq->revcom if ($reverse);
+       $writer->write_seq($newSeq);
+     }
+     else
+     {
+       $writer->write_seq($rec);
+     }
    }
  }

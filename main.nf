@@ -45,113 +45,105 @@ def output_path = "${params.output_path}"
 //def output_path=s3://genomics-workflow-core/Pipeline_Results/${params.output_prefix}"
 
 //println output_path
-
+//	.map{ row -> tuple(row.sample, row.reads1, row.reads2, row.long_reads, row.exist_long)}
 Channel
 	.fromPath(params.seedfile)
 	.ifEmpty { exit 1, "Cannot find any seed file matching: ${params.seedfile}." }
-  .splitCsv(header: ['sample', 'reads1', 'reads2', 'long_reads'], sep: '\t')
-	.map{ row -> tuple(row.sample, row.reads1, row.reads2, row.long_reads)}
+  .splitCsv(header: ['sample', 'prefix', 'reads1', 'reads2', 'long_reads'], sep: '\t')
+	.map{ row -> tuple(row.sample, row.prefix, row.reads1, row.reads2, row.long_reads)}
 	.set { seedfile_ch }
+
+  seedfile_ch.into {seedfile_ch1; seedfile_ch2}
+
+  /*
+   * Parse software version numbers
+   */
+  process get_software_versions {
+
+      errorStrategy 'ignore'
+      container params.container
+      cpus 2
+      memory 8.GB
+
+      publishDir "${output_path}/${sample}/${prefix}/software_info", mode: 'copy'
+
+      input:
+      tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads) from seedfile_ch1
+      output:
+      file "*"
+
+      script:
+      // TODO nf-core: Get all tools to print their version number here
+      """
+      echo $workflow.manifest.version > v_pipeline.txt
+      echo $workflow.nextflow.version > v_nextflow.txt
+      echo "Git info: $workflow.repository - $workflow.revision [$workflow.commitId]" > v_repo.txt
+      """
+  }
+
+
+  /*
+   * Run Hybridassembly Pipeline -long reads only
+   */
+  process hybridassembly_long {
+      tag "$sample"
+      //container "xianmeng/nf-hybridassembly:latest"
+      container params.container
+      cpus 32
+      memory 64.GB
+
+      publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_LONG", mode:'copy', pattern: "*.{log,gfa,fasta}"
+
+      input:
+    	tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads) from seedfile_ch2
+
+
+      output:
+      file "tmp_*/Sync/UNICYCLER/*"
+      file "tmp_*/Sync/UNICYCLER/assembly.fasta"
+      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path("tmp_*/Sync/UNICYCLER/assembly.fasta") into long_ch
+
+      script:
+      """
+      export sampleRate="${params.sampleRate}"
+      export longreads="${long_reads}"
+      export S3OUTPUTPATH="${output_path}/${sample}/${prefix}"
+      run_unicycler_long_only2.sh
+      """
+  }
+
+
 
   //seedfile_ch.view()
   /*
    * Run Hybridassembly Pipeline
    */
-  process hybridassembly_1 {
+  process hybridassembly {
 
       tag "$sample"
       //container "xianmeng/nf-hybridassembly:latest"
       container params.container
-      cpus   32
+      cpus 32
       memory 128.GB
 
-      //publishDir "${output_path}", mode:'copy'
-
       input:
-    	tuple val(sample), val(reads1), val(reads2), val(long_reads) from seedfile_ch
+    	//tuple val(sample), val(reads1), val(reads2), val(long_reads) from seedfile_ch2
+      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path(exist_long) from long_ch
+
 
       output:
-      tuple val(sample),  path("tmp_*/trimmed_fastq/read1_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/read2_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/long_trimmed.fastq.gz") into reads_ch
+      //path "*"
 
       script:
       """
+      export SAMPLE_NAME="${sample}"
       export coverage="${params.coverage}"
       export fastq1="${reads1}"
       export fastq2="${reads2}"
       export longreads="${long_reads}"
-      export S3OUTPUTPATH="${output_path}/${sample}"
-      run_unicycler_hybrid_nanopore_1.sh
+      export assembly="${exist_long}"
+      export S3OUTPUTPATH="${output_path}/${sample}/${prefix}"
+      run_unicycler_existing_long2.sh
+
       """
   }
-
-/*
- * Run Hybridassembly Pipeline -step 2
- * Assembly
- file tmp_/trimmed_fastq/read1_sampled.fastq.gz into read1_ch2
- *file tmp_/trimmed_fastq/read1_sampled.fastq.gz into read2_ch2
- file tmp_/trimmed_fastq/long_trimmed.fastq.gz  into longread_ch2
- file tmp_/Sync/UNICYCLER/assembly.fasta into assembly_ch2
-*/
-
-process hybridassembly_2 {
-
-    tag "${sample}"
-    container "quay.io/biocontainers/unicycler:0.5.0--py39h2add14b_2"
-    cpus 16
-    memory 64.GB
-
-    publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "*.{log,gfa,fasta}"
-    publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "assembly.*"
-    //publishDir "${output_path}/${sample}/UNICYCLER", mode:'copy', pattern: "*.{log,gfa}"
-    //publishDir "${output_path}/${sample}/Logs", mode:'copy', pattern: '*.txt'
-
-    input:
-  	tuple val(sample), path(read1), path(read2), path(long_read) from reads_ch
-
-    output:
-    file "tmp_*/Sync/UNICYCLER/*"
-    file "tmp_*/Sync/UNICYCLER/assembly.gfa"
-    //file "tmp_*/Sync/Logs/unicycler_assembly.log.txt"
-    tuple val(sample),  path("tmp_*/trimmed_fastq/read1_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/read2_sampled.fastq.gz"), path("tmp_*/trimmed_fastq/long_trimmed.fastq.gz"), path("tmp_*/Sync/UNICYCLER/assembly.fasta"), path("tmp_*/Sync/UNICYCLER/unicycler.log") into reads_ch2
-
-    script:
-    """
-    export fastq1="${read1}"
-    export fastq2="${read2}"
-    export longreads="${long_read}"
-    export S3OUTPUTPATH="${output_path}/${sample}"
-    run_unicycler_hybrid_nanopore_2.sh
-    """
-}
-
-/*
- * Run Hybridassembly Pipeline Step 3
- * Post-processing
-*/
-
-process hybridassembly_3 {
-    tag "$sample"
-    container "fischbachlab/nf-hybridassembly:latest"
-    cpus 16
-    memory 64.GB
-
-    //publishDir "${output_path}", mode:'copy'
-
-    input:
-    tuple val(sample), path(read_1), path(read_2), path(long_read), path(assembled_reads), path(assembly_log) from reads_ch2
-
-
-    output:
-    //path "*"
-
-    script:
-    """
-    export fastq1="${read_1}"
-    export fastq2="${read_2}"
-    export longreads="${long_read}"
-    export assembly="${assembled_reads}"
-    export log="${assembly_log}"
-    export S3OUTPUTPATH="${output_path}/${sample}"
-    run_unicycler_hybrid_nanopore_3.sh
-    """
-}
