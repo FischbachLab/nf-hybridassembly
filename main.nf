@@ -56,6 +56,26 @@ Channel
   seedfile_ch.into {seedfile_ch1; seedfile_ch2}
 
   /*
+   * Save the seedfile into the straindb database
+   cp $seed ${seed.baseName}.copy.tsv
+   */
+  process save_seedfile {
+
+      publishDir "s3://genomics-workflow-core/aws-miti-straindb-us-west-2/aws_glue/assembly_seedfiles/"
+
+      input:
+      file seed from  Channel.fromPath(params.seedfile)
+      output:
+      file "${seed}"
+
+     script:
+     """
+      ls $seed
+     """
+
+  }
+
+  /*
    * Parse software version numbers
    */
   process get_software_versions {
@@ -99,8 +119,8 @@ Channel
 
 
       output:
-      file "tmp_*/Sync/UNICYCLER/*"
-      file "tmp_*/Sync/UNICYCLER/assembly.fasta"
+      path "tmp_*/Sync/UNICYCLER/*"
+      //file "tmp_*/Sync/UNICYCLER/assembly.fasta"
       tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path("tmp_*/Sync/UNICYCLER/assembly.fasta") into long_ch
 
       script:
