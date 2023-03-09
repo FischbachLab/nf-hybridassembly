@@ -62,7 +62,8 @@ Channel
   process save_seedfile {
 
       publishDir "s3://genomics-workflow-core/aws-miti-straindb-us-west-2/aws_glue/assembly_seedfiles/"
-
+      container params.container
+      
       input:
       file seed from  Channel.fromPath(params.seedfile)
       output:
@@ -72,7 +73,6 @@ Channel
      """
       ls $seed
      """
-
   }
 
   /*
