@@ -110,7 +110,7 @@ Channel
       //container "xianmeng/nf-hybridassembly:latest"
       container params.container
       cpus 32
-      memory 64.GB
+      memory 128.GB
 
       publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_LONG", mode:'copy', pattern: "*.{log,gfa,fasta}"
 
