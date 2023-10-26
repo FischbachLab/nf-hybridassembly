@@ -5,10 +5,10 @@ Sample scripts
 ## The latest version with a seedfile as the input
 ```{bash}
 aws batch submit-job \
-  --job-name nf-hybrid-assembly \
+  --job-name nf-hybridassembly \
   --job-queue priority-maf-pipelines \
   --job-definition nextflow-production \
-  --container-overrides command="FischbachLab/nf-hybrid-assembly, \
+  --container-overrides command="FischbachLab/nf-hybridassembly, \
 "--seedfile", "s3://genomics-workflow-core/Results/HybridAssembly/BrianYu_20220311/HotspringMatIsolate_Chloroflexus-Stock92-20220203.tsv", \
 "--coverage", "100", \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/BrianYu_20220311" "
@@ -18,10 +18,10 @@ aws batch submit-job \
 #### sampleRate must be greater than 0 and less than 100
 ```{bash}
 aws batch submit-job \
-  --job-name nf-hybrid-assembly \
+  --job-name nf-hybridassembly \
   --job-queue priority-maf-pipelines \
   --job-definition nextflow-production \
-  --container-overrides command="FischbachLab/nf-hybrid-assembly, \
+  --container-overrides command="FischbachLab/nf-hybridassembly, \
 "--sampleRate", "50", \
 "--seedfile", "s3://genomics-workflow-core/Results/HybridAssembly/Nathan_20220301/1.seedfile.tsv", \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/Nathan_20220301/tmp" "
@@ -38,7 +38,7 @@ SH0001651-00109 20221021 s3://maf-sequencing/Illumina/MITI-MCB/G04_MITI001_SH000
 ### Final output path: s3://genomics-workflow-core/Results/HybridAssembly/MITI-MCB/sample_name/prefix/
 ```{bash}
 aws batch submit-job \
-  --job-name nf-hybrid-assembly \
+  --job-name nf-hybridassembly \
   --job-queue priority-maf-pipelines \
   --job-definition nextflow-production \
   --container-overrides command="FischbachLab/nf-hybridassembly, \
