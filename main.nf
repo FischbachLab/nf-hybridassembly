@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=1
+nextflow.enable.dsl=2
 // If the user uses the --help flag, print the help text below
 params.help = false
 
@@ -44,16 +44,6 @@ Channel
 def output_path = "${params.output_path}"
 //def output_path=s3://genomics-workflow-core/Pipeline_Results/${params.output_prefix}"
 
-//println output_path
-//	.map{ row -> tuple(row.sample, row.reads1, row.reads2, row.long_reads, row.exist_long)}
-Channel
-	.fromPath(params.seedfile)
-	.ifEmpty { exit 1, "Cannot find any seed file matching: ${params.seedfile}." }
-  .splitCsv(header: ['sample', 'prefix', 'reads1', 'reads2', 'long_reads'], sep: '\t')
-	.map{ row -> tuple(row.sample, row.prefix, row.reads1, row.reads2, row.long_reads)}
-	.set { seedfile_ch }
-
-  seedfile_ch.into {seedfile_ch1; seedfile_ch2}
 
   /*
    * Save the seedfile into the straindb database
@@ -63,15 +53,15 @@ Channel
 
       publishDir "s3://genomics-workflow-core/aws-miti-straindb-us-west-2/aws_glue/assembly_seedfiles/"
       container params.container
-      
+
       input:
-      file seed from  Channel.fromPath(params.seedfile)
+      path seed
       output:
-      file "${seed}"
+      path "${seed}"
 
      script:
      """
-      ls $seed
+      head $seed
      """
   }
 
@@ -85,12 +75,12 @@ Channel
       cpus 2
       memory 8.GB
 
-      publishDir "${output_path}/${sample}/${prefix}/software_info", mode: 'copy'
+      publishDir "${output_path}/${sample}/${prefix}/software_info", mode: 'copy', pattern: "*.{txt}"
 
       input:
-      tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads) from seedfile_ch1
+      tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads)
       output:
-      file "*"
+      file "*.txt"
 
       script:
       // TODO nf-core: Get all tools to print their version number here
@@ -110,18 +100,18 @@ Channel
       //container "xianmeng/nf-hybridassembly:latest"
       container params.container
       cpus 32
-      memory 128.GB
+      memory 64.GB
 
-      publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_LONG", mode:'copy', pattern: "*.{log,gfa,fasta}"
+      //publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_LONG", mode:'copy', pattern: "*.{log,gfa,fasta}"
 
       input:
-    	tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads) from seedfile_ch2
+    	tuple  val(sample), val(prefix), val(reads1), val(reads2), val(long_reads)
 
 
       output:
-      path "tmp_*/Sync/UNICYCLER/*"
+      //path "tmp_*/Sync/UNICYCLER/*"
       //file "tmp_*/Sync/UNICYCLER/assembly.fasta"
-      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path("tmp_*/Sync/UNICYCLER/assembly.fasta") into long_ch
+      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path("tmp_*/Sync/UNICYCLER/assembly.fasta")
 
       script:
       """
@@ -148,7 +138,7 @@ Channel
 
       input:
     	//tuple val(sample), val(reads1), val(reads2), val(long_reads) from seedfile_ch2
-      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path(exist_long) from long_ch
+      tuple val(sample), val(prefix), val(reads1), val(reads2), val(long_reads), path(exist_long)
 
 
       output:
@@ -166,4 +156,21 @@ Channel
       run_unicycler_existing_long2.sh
 
       """
+  }
+
+  Channel
+    .fromPath(params.seedfile)
+    .ifEmpty { exit 1, "Cannot find any seed file matching: ${params.seedfile}." }
+    .splitCsv(header: ['sample', 'prefix', 'reads1', 'reads2', 'long_reads'], sep: '\t')
+    .map{ row -> tuple(row.sample, row.prefix, row.reads1, row.reads2, row.long_reads)}
+    .set { seedfile_ch }
+
+  workflow {
+
+    seedfile_ch | get_software_versions
+    Channel.fromPath(params.seedfile) | save_seedfile
+    seedfile_ch | hybridassembly_long
+
+    hybridassembly_long.out | hybridassembly
+
   }
