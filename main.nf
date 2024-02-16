@@ -142,7 +142,7 @@ def output_path = "${params.output_path}"
 
 
       output:
-      //path "*"
+      tuple val(sample), val(prefix), path("tmp_*/raw_fastq/read1.fastq.gz"), path("tmp_*/raw_fastq/read2.fastq.gz"), path("tmp_*/Sync/UNICYCLER/assembly.fasta")
 
       script:
       """
@@ -158,6 +158,55 @@ def output_path = "${params.output_path}"
       """
   }
 
+  process hybridassembly_bwa {
+      tag "$sample"
+      //container "xianmeng/nf-hybridassembly:latest"
+      container params.container_bwa
+      cpus 16
+      memory 32.GB
+
+      //publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_POLISHED", mode:'copy', pattern: "*.{fasta}"
+
+      input:
+      tuple val(sample), val(prefix), path(reads1), path(reads2), path(draft_assembly)
+
+      output:
+      tuple val(sample), val(prefix), path("alignments_1.sam"),  path("alignments_2.sam"), path(draft_assembly)
+
+      script:
+      """
+      bwa index ${draft_assembly}
+      bwa mem -t 16 -a ${draft_assembly} ${reads1} > alignments_1.sam
+      bwa mem -t 16 -a ${draft_assembly} ${reads2} > alignments_2.sam
+      rm *.amb *.ann *.bwt *.pac *.sa
+      """
+  }
+
+
+  process hybridassembly_polish {
+      tag "$sample"
+      //container "xianmeng/nf-hybridassembly:latest"
+      container params.container_polish
+      cpus 16
+      memory 32.GB
+
+      publishDir "${output_path}/${sample}/${prefix}/UNICYCLER_POLISHED", mode:'copy', pattern: "*.{fasta}"
+
+      input:
+      tuple val(sample), val(prefix),path(alignments_1), path(alignments_2), path(draft_assembly)
+
+      output:
+      file "${sample}.fasta"
+
+      script:
+      """
+      polypolish filter --in1 ${alignments_1} --in2 ${alignments_2} --out1 filtered_1.sam --out2 filtered_2.sam
+      polypolish polish ${draft_assembly} filtered_1.sam filtered_2.sam > ${sample}.fasta
+      rm *.sam
+      """
+  }
+
+
   Channel
     .fromPath(params.seedfile)
     .ifEmpty { exit 1, "Cannot find any seed file matching: ${params.seedfile}." }
@@ -172,5 +221,7 @@ def output_path = "${params.output_path}"
     seedfile_ch | hybridassembly_long
 
     hybridassembly_long.out | hybridassembly
+    hybridassembly.out | hybridassembly_bwa
+    hybridassembly_bwa.out | hybridassembly_polish
 
   }

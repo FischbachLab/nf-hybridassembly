@@ -45,3 +45,5 @@ aws batch submit-job \
 "--seedfile", "s3://genomics-workflow-core/Results/HybridAssembly/20221018.11.seedfile.tsv", \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/MITI-MCB" "
 ```
+
+## The assembly is further polished by [Polypolish] (https://github.com/rrwick/Polypolish): short-read polisher for draft assembly. The polished assembly can be found in the folder UNICYCLER_POLISHED
