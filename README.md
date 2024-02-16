@@ -46,4 +46,6 @@ aws batch submit-job \
 "--output_path", "s3://genomics-workflow-core/Results/HybridAssembly/MITI-MCB" "
 ```
 
-## The assembly is further polished by [Polypolish] (https://github.com/rrwick/Polypolish): short-read polisher for draft assembly. The polished assembly can be found in the folder UNICYCLER_POLISHED
+### The draft assembly is further polished by
+[Polypolish] (https://github.com/rrwick/Polypolish): short-read polisher for long reads. 
+The polished assembly can be found in the folder UNICYCLER_POLISHED
